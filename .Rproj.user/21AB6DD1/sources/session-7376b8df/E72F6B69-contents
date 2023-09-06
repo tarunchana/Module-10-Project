@@ -46,6 +46,32 @@ G7_nrg_graph <- ggplot(data = G7_energy, aes(x = Date, y = value, color = Countr
   labs(x = "Date (Year)", y = "12-Month Rate (%)", 
        title = expression(bold(underline("12-Month Rate of Energy Inflation across major G7 Countries since the Pandemic")))) +
   theme_minimal()
-plot(G7_nrg_graph)
+
+# Energy inflation isn't the only factor effecting the cost of living crisis however, 
+# many goods and services are having a substantial impact on the cost of living crisis too. 
+# Here are the CPI inflation rates of classes of goods and services to show how they contribute
+
+GS_CPI <- read.csv("Data/In_the_year_to_March_2023_over_70%_of_CPI_items_experienced_a_price_increase_of_at_least_4%.csv", header = TRUE, skip = 6)
+names(GS_CPI)[1] = "Item"
+GS_CPI <- GS_CPI %>%
+  gather(key = "Variable", value = "Value", -Item) %>%
+  filter(complete.cases(.)) %>%
+  arrange(Value)
+names(GS_CPI)[2] = "Category"
+
+
+GS_graph <- ggplot(data = GS_CPI, aes(x = reorder(Item, -Value), y = Value, fill = Category)) +
+  geom_bar(stat = "identity", width = 0.8) +
+  labs(
+    x = "Item",
+    y = "%",
+    title = expression(bold(underline("12-Month Rate of CPI Inflation for Goods and Services from March 2022-2023")))
+  ) +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 6), 
+        legend.position = "bottom",
+        legend.text = element_text(size = 8)) + 
+  scale_fill_manual(values = c( "Food.and.non.alcoholic.beverages"  = "purple", "Energy" = "blue", "Other" = "green")) +
+  coord_flip()
 
 
