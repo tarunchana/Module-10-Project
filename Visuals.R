@@ -1,9 +1,8 @@
 # Utilising data from ONS articles to create visualisations for analysis
 
 # Import packages
-library(tidyverse) # contains ggplot2, tidyr, dplyr and readr
-library(janitor) # To clean column names
-library(reshape2)
+library(tidyverse) # contains ggplot2, tidyr, dplyr, readr and reshape2
+
 
 # Graph of CPI inflation since the pandemic compared against other major G7 countries  
 G7_data <- read.csv("Data/The_increase_in_the_price_level_since_the_pandemic_in_the_UK_is_the_highest_across_the_G7.csv", header = TRUE, skip = 8)
@@ -88,4 +87,25 @@ nrg_intensity_graph <- ggplot(data = nrg_intensity, aes(x = reorder(Division, -E
 plot(nrg_intensity_graph) +
 coord_flip()
 
+# Contributions to Consumer Prices Index (CPI) inflation by energy intensity, percentage points, UK, January 2019 to February 2023
+intensity_CPI <- read.csv("Data/More_than_three-quarters_of_the_10.csv", header = TRUE, skip = 8)
+names(intensity_CPI)[1] = "Date"
+intensity_CPI$Date <- as.Date(paste0("01-", intensity_CPI$Date), format = "%d-%Y %b")
+intensity_CPI <- intensity_CPI %>%
+  pivot_longer(cols = c("Rents","Energy", "Very.high", "High", "Low","Very.low"), names_to = "Category", values_to = "Value")
+intensity_CPI$Category <- factor(intensity_CPI$Category, levels = c("Rents","Energy", "Very.high", "High", "Low","Very.low"))
 
+intensity_CPI_comp <- ggplot(data = intensity_CPI, aes(x = Date, y = Value, fill = Category)) +
+  geom_bar(stat = "identity", position = "stack", width = 10) +
+  labs(
+    x = "Date",
+    y = "%",
+    title = expression(bold(underline("Contributions to CPI inflation by Energy Intensity from January 2019 to February 2023")))) +
+  theme_minimal() +
+  scale_fill_manual(values = c(
+    "Rents" = "pink",
+    "Energy" = "blue",
+    "Very.high" = "red",
+    "High" = "orange",
+    "Low" = "green",
+    "Very.low" = "purple"))
