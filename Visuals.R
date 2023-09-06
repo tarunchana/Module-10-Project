@@ -74,4 +74,18 @@ GS_graph <- ggplot(data = GS_CPI, aes(x = reorder(Item, -Value), y = Value, fill
   scale_fill_manual(values = c( "Food.and.non.alcoholic.beverages"  = "purple", "Energy" = "blue", "Other" = "green")) +
   coord_flip() 
 
+# Energy intensity at the CPI division level, excluding direct effects of energy
+nrg_intensity <- read.csv("Data/Restaurants_and_hotels_have_the_highest_energy_intensity_at_the_CPI_division_level,_if_we_exclude_those_that_include_the_direct_effects_of_energy.csv", header = TRUE, skip = 7)
+names(nrg_intensity)[1] = "Division"
+
+nrg_intensity_graph <- ggplot(data = nrg_intensity, aes(x = reorder(Division, -Energy.Intensity), y = Energy.Intensity)) +
+  geom_bar(stat = "identity", width = 0.9, fill = "green") +
+  labs(
+    x = "",
+    y = "%",
+    title = expression(bold(underline("Energy Intensity at the CPI Division Level, Excluding Direct Effects of Energy")))) +
+  theme_minimal()
+plot(nrg_intensity_graph) +
+coord_flip()
+
 
