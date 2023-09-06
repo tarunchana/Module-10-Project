@@ -1,0 +1,449 @@
+---
+title: "Gamma GLM"
+output: html_document
+date: "2023-07-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.height = 15, fig.width = 20)
+
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+library(tidyverse)
+library(MASS)
+library(fitdistrplus)
+library(DHARMa)
+
+cut_number_readable <- function(x, n, ...) {
+    # Get the cuts
+    cuts <- cut_number(x, n, ...)
+    
+    # Create a function to format each level
+    format_level <- function(level) {
+        # Split the level at comma
+        bounds <- strsplit(as.character(level), ",")[[1]]
+        
+        # Handle the lower bound
+        if(startsWith(bounds[1], "(")) {
+            lower <- paste0(">", substr(bounds[1], 2, nchar(bounds[1])))
+        } else {
+            lower <- paste0(">=", substr(bounds[1], 2, nchar(bounds[1])))
+        }
+        
+        # Handle the upper bound
+        if(endsWith(bounds[2], "]")) {
+            upper <- paste0("\nand <=", substr(bounds[2], 1, nchar(bounds[2]) - 1))
+        } else {
+            upper <- paste0("\nand <", substr(bounds[2], 1, nchar(bounds[2]) - 1))
+        }
+        
+        # Return the combined bounds
+        return(paste0(lower, upper))
+    }
+    
+    # Apply the function to each level
+    levels(cuts) <- sapply(levels(cuts), format_level)
+    
+    # Return the updated cuts
+    return(cuts)
+}
+
+```
+
+# This demo walks through the process of building a gamma GLM in R
+
+## Read in data
+
+First, let's read in some data. This is a pre-prepared dummy dataset with some columns of predictor
+variables and a response variables
+
+```{r read_date}
+data <- read.csv(
+  "L:/Development_Processes/Training/R training/Training area/SamK/gamma_glm_data.csv"
+)
+
+
+```
+
+## Explore the data
+
+Let's explore the dataset to get an idea of what it contains.
+
+```{r explore_data}
+
+#print the first 6 rows
+data %>% head()
+
+#summarise the columns
+data %>% summary()
+
+#view the first 6 unique values of every column
+
+data %>%
+  summarise(
+    across(
+      .cols = everything(), 
+      .fns = function(x) paste(sort(round(unique(x),3))[1:min(6, length(unique(x)))], collapse = ';')
+    )
+  ) 
+
+
+
+```
+
+## Visualise the data
+
+The data has 4 columns, containing two categorical variables and one continuous variable - we will use
+these as predictor variables. There is also a column called 'response'. We are going to build a model 
+that predicts the value of 'response' based on the values of the predictor variables. First, let's visualise the distribution of the response variable and its relationship with the predictor variables.
+
+```{r visualise_data}
+
+data %>%
+  ggplot() +
+  geom_histogram(aes(x = response), bins = 30) +
+  theme_bw(base_size = 28) +
+  ggtitle('Distribution of response variable')
+  
+
+data %>%
+  mutate(cont = cut_number_readable(cont, 4)) %>%
+  group_by(cat1, cat2, cont) %>%
+  summarise(`Mean response` = mean(response)) %>%
+  ggplot() +
+  geom_point(aes(
+    x = cont, y= `Mean response`
+  ), size = 6
+  ) +
+  facet_grid(vars(paste0('cat1: ', cat1)), vars(paste0('cat2: ', cat2))) +
+  theme_bw(base_size = 28) +
+  ggtitle('Mean value of response variable for different combinations of predictor variables')
+
+```
+
+Since our response variable is not normally distributed, looking at its mean value for different levels
+of the predictor variables might not give us a full picture. So let's visualise the distribution of the
+response variable for all levels of the predictor variables.
+
+```{r visualise_dist}
+
+
+data %>%
+    mutate(cont_cut =  paste0('Cont:\n', cut_number_readable(cont, 4))) %>%
+    ggplot() +
+    geom_density(aes(x = response, fill = factor(cat1)), alpha = 0.5) + 
+    facet_grid(vars(paste0('Cat2: ', cat2)), vars(cont_cut)) +
+    theme_bw(base_size = 28) +
+    ggtitle(
+        'Distribution of response variable for different levels of the predictor variables'
+    ) + labs(fill = 'Cat 1')
+
+
+```
+ 
+## Identify appropriate modelling technique
+ 
+In order to determine what modelling approach is most appropriate, we need to identify the 
+distribution that best characterises our response variable.
+
+### Gamma distributon
+ 
+```{r correct_distribution}
+ 
+ # Calculate the mean and variance of the data - this is needed when fitting
+#to some of the distributions
+
+values <- data$response
+response_mean <- mean(values)
+response_variance <- var(values)
+
+# Estimate the shape and rate parameters using the method of moments
+alpha_est <- (response_mean^2) / response_variance
+beta_est <- response_mean / response_variance
+
+fit_gamma <- fitdist(
+  values,
+  "gamma",
+  start=list(shape=alpha_est, rate=beta_est),
+  method="mme"
+  )
+
+#extract Gamma parameters
+gamma_shape <- fit_gamma$estimate['shape']
+gamma_rate <- fit_gamma$estimate['rate']
+
+#use gamma parameters to generate test data randomly sampled from a
+#gamma distribution with the same parameters
+gamma_test <- rgamma(n = length(values), shape = gamma_shape, rate = gamma_rate)
+
+ggplot(data.frame(values)) + 
+  geom_histogram(aes(x = values, fill = 'response variable'), alpha = 0.5) + 
+  geom_histogram(aes(x = gamma_test, fill = 'random gamma distribution'), alpha = 0.5) +
+  theme_bw(base_size = 28) +
+  scale_fill_manual(
+    values = c(
+      'response variable' = 'red', 
+      'random gamma distribution' = 'blue'
+    )
+  ) +
+  labs(fill = '')
+
+
+
+
+```
+
+### Lognormal distribution
+
+Let's see if it fits a lognormal distribution
+
+```{r fit_pareto}
+
+fit_lnorm <- fitdist(values, "lnorm")
+
+lnorm_test <- rlnorm(
+  n = nrow(data), 
+  meanlog = fit_lnorm$estimate['meanlog'],
+  fit_lnorm$estimate['sdlog']
+  )
+
+ggplot(data.frame(values)) + 
+  geom_histogram(aes(x = values, fill = 'response variable'), alpha = 0.5) + 
+  geom_histogram(aes(x = lnorm_test, fill = 'random lnorm distribution'), alpha = 0.5) +
+  theme_bw(base_size = 28) +
+  scale_fill_manual(
+    values = c(
+      'response variable' = 'red', 
+      'random lnorm distribution' = 'blue'
+    )
+  ) +
+  labs(fill = '')
+
+```
+
+In addition to inspecting the shape of the distribution, we can get some numeric metrics that allow us
+to quantify the 'goodness of fit' of different distributions:
+
+```{r goodness_of_fit}
+print(paste0('Gamma AIC: ', fit_gamma$aic))
+print(paste0('Lognormal AIC: ', fit_lnorm$aic))
+
+```
+
+It looks like the gamma distribution has the best fit. So let's build a Gamma GLM that predicts the
+values of our response variable based on the predictor variables. We will use a log link, which is
+standard when using Gamma GLM.
+
+
+## Fit the model
+
+```{r fit_model}
+
+gamma_model <- glm(
+  response ~ cont + cat1 + cat2, #+ cat5 * cat3, 
+  family = Gamma(link = "log"),
+  data = data
+  )
+print(summary(gamma_model))
+
+```
+
+All the predictor variables are significant. Let's derive the predictions from our model to see how well
+they match to the actual data. Because we used a log-linked gamma glm, the exponential of the predicted
+values are comparable to the actual response values.
+
+```{r overall_match}
+
+predictions <- predict(gamma_model, data, type = 'response')
+data <- mutate(data, predictions = predictions)
+
+overall_plot <- data %>%
+  mutate(rounded_prediction = round(predictions)) %>%
+  group_by(rounded_prediction) %>%
+  summarise(mean_response = mean(response)) %>%
+  ggplot() + 
+  geom_point(
+    aes(x = rounded_prediction, y = mean_response)
+  ) +
+  theme_bw(base_size = 28) +
+  labs(
+    x = 'Rounded prediction', 
+    y = 'Mean response'
+  )
+
+print(overall_plot)
+
+```
+
+This gives us a good match overall. Let's break this down by each of our predictor variables - that way,
+we can determine whether there are any combinations of predictor variables where the model performs 
+poorly
+
+```{r broken_down}
+
+data %>%
+  mutate(rounded_prediction = round(predictions)) %>%
+  group_by(rounded_prediction, cat1) %>%
+  summarise(mean_response = mean(response)) %>%
+  ggplot() + 
+  geom_point(
+    aes(x = rounded_prediction, y = mean_response)
+  ) +
+  theme_bw(base_size = 28) +
+  facet_wrap(~cat1) +
+  ggtitle('Broken down by cat1')
+
+data %>%
+  mutate(rounded_prediction = round(predictions)) %>%
+  group_by(rounded_prediction, cat2) %>%
+  summarise(mean_response = mean(response)) %>%
+  ggplot() +  
+  geom_point(
+    aes(x = rounded_prediction, y = mean_response)
+  ) +
+  theme_bw(base_size = 28) +
+  facet_wrap(~cat2) +
+  ggtitle('Broken down by cat2')
+
+data %>%
+  mutate(rounded_prediction = round(predictions)) %>%
+  mutate(rounded_cont = cut_number_readable(cont, 4)) %>%
+  group_by(rounded_prediction, rounded_cont) %>%
+  summarise(mean_response = mean(response)) %>%
+  ggplot() +  
+  geom_point(
+    aes(x = rounded_prediction, y = mean_response)
+  ) +
+  theme_bw(base_size = 28) +
+  facet_wrap(~rounded_cont) +
+  ggtitle('Broken down by cont')
+
+ 
+```
+
+
+Overall, we get a reasonable match between predicted and actual values for the different levels
+of the predictor variables. But breaking down by 'cont' indicates that there are some cominations of
+predictors where we could be doing a better job.
+
+Also, look back up to the dotplot that we produced earlier - it seems that there is an interaction
+between 'cat1' and 'cat2' - the effect of cat1 on the response variable is different, depending on
+the value of cat2. 
+
+So let's include an interaction term in our model and see if it is significant.
+
+```{r interaction}
+
+gamma_model2 <- glm(
+  response ~ cont + cat1 + cat2 + cat1 * cat2, 
+  family = Gamma(link = "log"),
+  data = data
+  )
+print(summary(gamma_model2))
+
+```
+
+The interaction term is significant, which indicates that we should be including it in our model.
+Let's compare the predictions of this new model to the actual data.
+
+```{r compare_interaction}
+
+predictions2 <- predict(gamma_model2, data, type = 'response')
+data <- mutate(data, predictions2 = predictions2)
+
+interaction_overall_plot <- 
+  data %>%
+  mutate(rounded_prediction2 = round(predictions2)) %>%
+  group_by(rounded_prediction2) %>%
+  summarise(mean_response = mean(response)) %>%
+  ggplot() + 
+  geom_point(
+    aes(x = rounded_prediction2, y = mean_response)
+  ) +
+  theme_bw(base_size = 28) +
+  ggtitle('With interaction term') +
+  labs(x = 'Prediction', y = 'Mean response')
+
+cowplot::plot_grid(
+  interaction_overall_plot,
+  overall_plot + ggtitle('Without interaction term')
+  )
+```
+
+It's difficult to see which model performs best from the plot. But looking at the outputs of the 
+'summary' functions, we can see that the model with the interaction term has lower 'residual deviance'
+and a lower AIC. We can also show that the model with the interaction term has a lower 'BIC'
+
+```{r BIC}
+
+BIC(gamma_model, gamma_model2)
+
+```
+
+
+## Assessing distribution of residuals
+
+With Gamma GLMs, we need to assess the distribution of residuals across the different response variables in order
+to assess whether the core GLM assumptions hold true. Specifically, we need to ascertain whether the residuals are distributed
+as expected at the different levels of the predictor variables.
+
+Let us first look at the residuals across all of our data
+```{r residual dist}
+
+
+gamma_model2$residuals %T>%
+    {print(summary(.))} %>%
+    {ggplot(data.frame(NULL)) + geom_histogram(aes(x = .))} +
+    theme_bw(base_size = 28) +
+    ggtitle('Distribution of absolute residuals for interaction model')
+
+
+```
+
+Oops! Our residuals are not normally distributed. But not worry, they shouldn't be - if we are working with 'standard' residuals
+that tell us the absolute difference between model predictions and actual data. We only expected the 'standardised' residuals
+to be normally distributed - these residuals take account of the fact that the variance of a gamma distribution increases as
+its mean increases.
+Even better, we can use the Dharma package to calculate some scaled residuals based on simulation. These should be uniformly
+distributed across all levels of the predictor variables.
+
+```{r dhamra_residuals}
+
+simulated_residuals <- simulateResiduals(gamma_model2)
+scaled_residuals <- simulated_residuals$scaledResiduals
+
+data %>% mutate(scaled_residuals = scaled_residuals) %>%
+  mutate(prediction_interval = cut_number_readable(predictions2, 4)) %>%
+  ggplot() + 
+  geom_histogram(aes(x =  scaled_residuals)) +
+  facet_wrap(~paste0('Prediction interval: ', prediction_interval)) +
+  theme_bw(base_size = 24) +
+  labs(x = 'Scaled residuals calculated with DHARMa package')
+  
+
+```
+
+## Do our findings generalise?
+
+So far, we have only tested our model on the same dataset that was used to train it. To ensure that we have not 'over fitted' to 
+our training data, let's apply it to some test data. NB - I created the 'test_data' and 'data' by randomly splitting an initial 
+dataset.
+
+```{validate_with_test_set}
+
+test_data <- read.csv(
+  "L:/Development_Processes/Training/R training/Training area/SamK/gamma_glm_test_data.csv"
+)
+
+test_data %>% head()
+
+test_predictions <- predict(gamma_model2, test_data, type = 'response')
+
+test_data %>% 
+  mutate(pred = test_predictions) %>% 
+  group_by(pred = round(pred)) %>% summarise(resp = mean(response), count = n()) %>% 
+  ggplot() + geom_point(aes(x = pred, y = resp, size = count)) +
+  labs(x = 'Rounded prediction', y = 'Mean response') +
+  theme_bw(base_size = 28)
+  
+
+```
