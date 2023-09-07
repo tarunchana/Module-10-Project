@@ -1,0 +1,215 @@
+---
+title: <span style="color:navy; font-weight:bold;">How has the Energy Price Inflation impacted the UK in comparison to other G7
+  Countries, and what does this subsequently mean for the UK's Cost of Living Crisis?</span>
+author: <span style="font-weight:bold;">Tarun Chana</span>
+date: <span style="font-weight:bold;">7th September 2023</span>
+output: html_document
+---
+# <span style="color:navy;">Introduction</span> 
+
+In recent times, the United Kingdom has faced an unprecedented surge in energy price inflation, sending shockwaves through households and the broader economy. As the cost of energy continues its relentless ascent, the UK finds itself grappling with a profound cost of living crisis. This analysis aims to shed light on the consequences and subsequent indirect impacts of this energy price surge, exploring its far-reaching effects on other economic sectors in comparison to G7 countries.  Ultimately, this independent analysis will arrive at an informed conclusion that can guide policy changes to aid in alleviating the burdens faced by the UK's residents through this crisis. 
+
+# <span style="color:navy;">Setup</span> 
+
+First, to start this analysis, a couple setup steps are necessary. The working directory was set to the current project location and the required packages have been installed and loaded. 
+
+```{r setup, include=TRUE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE,fig.height = 8, fig.width = 10)
+
+#  Set the working directory to the current location
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+
+# Import packages
+library(tidyverse) # contains ggplot2, tidyr, dplyr, readr 
+library(reshape2)  # For long form data formatting
+
+```
+
+## <span style="color:navy;">Consumer Price Index Inflation</span> 
+
+Since the pandemic, the cost of living crisis has become an increasingly worrying issue for the general public. In order to understand why this has been the case, it is first vital to evaluate the reason for this current inflation wave. The last two years have seen a dramatic increase in CPI of approximately **18%**. In contrast to this, during the eight year period prior to the COVID-19 pandemic, inflation was on average held slightly below the Bank of England's inflation targets of 2% - totaling **14%** over that whole period. This alarming but predictable outcome was similarly experienced in other major G7 countries. 
+
+Figure 1 below illustrates the aforementioned increase in price level across the G7, utilising a base index of **100 at 2019**. Data was obtained from [ONS: Food and energy price inflation, UK:2023](https://www.ons.gov.uk/economy/inflationandpriceindices/articles/foodandenergypriceinflationuk/2023)
+
+```{r G7 CPI,echo=FALSE, message=FALSE, warning=FALSE}
+# Read in the ONS article data
+G7_data <- read.csv("Data/The_increase_in_the_price_level_since_the_pandemic_in_the_UK_is_the_highest_across_the_G7.csv", header = TRUE, skip = 8)
+# Some data manipulation to rename and retype some columns 
+names(G7_data)[1] = "Date"
+G7_data <- melt(G7_data, id.vars = "Date")
+names(G7_data)[2] = "Country"
+G7_data$Date <- as.Date(paste0("01-", G7_data$Date), format = "%d-%b-%y")
+
+# Graph of CPI inflation since the pandemic compared against other major G7 countries  
+G7_graph <- ggplot(data = G7_data, aes(x = Date, y = value, color = Country, group = Country)) +
+  geom_line(size = 0.8) +
+  geom_line(data = subset(G7_data, Country == "UK"), line = 1.5) +
+  scale_color_manual(values = c("UK" = "red",
+                                "France" = "blue",
+                                "Germany" = "green",
+                                "Italy" = "purple",
+                                "Japan" = "orange",
+                                "US" = "black",
+                                "Canada" = "pink"), guide = guide_legend(title = "Country")) +
+  labs(x = "Date (Year)", y = "CPI",
+       title = expression(bold(underline("CPI Inflation across Major G7 Countries since the Pandemic")))) +
+  theme_minimal() +
+  scale_x_date(date_breaks = "3 months", date_labels = "%b %Y")  
+G7_graph <- G7_graph + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+plot(G7_graph)
+
+```
+
+Within other G7 countries, there is some evidence to believe that the signs of inflation is beginning to fall. However, there is little evidence for this in the UK. The impact of energy inflation within this model is currently unclear, in order to see the part that energy inflation plays in this cost of living crisis, we can hone in on this factor across the last year. 
+
+## <span style="color:navy;">Energy Inflation</span> 
+
+The UK annual energy price inflation is evident. Among G7 countries, the UK has the highest inflation rate at 40.5% in comparison to mostly low single digit - and sometimes now negative - inflation rates.
+
+Figure 2 outlines this major discrepancy through a direct comparison of 12-month rates of energy inflation between January 2018 and March 2023. Data was obtained from [ONS: Food and energy price inflation, UK:2023](https://www.ons.gov.uk/economy/inflationandpriceindices/articles/foodandenergypriceinflationuk/2023)
+
+```{r G7 energy, echo = FALSE}
+#Read in data from ONS article
+G7_energy <- read.csv("Data/UK_energy_price_inflation_was_the_highest_across_major_advanced_economies_in_March_2023.csv", header = TRUE, skip = 6)
+# Some data manipulation to rename and retype some columns 
+names(G7_energy)[1] = "Date"
+G7_energy <- melt(G7_energy, id.vars = "Date")
+names(G7_energy)[2] = "Country"
+G7_energy$Date <- as.Date(paste0("01-", G7_energy$Date), format = "%d-%b-%y")
+
+# Graph of energy inflation since the pandemic compared against other major G7 countries 
+G7_nrg_graph <- ggplot(data = G7_energy, aes(x = Date, y = value, color = Country, group = Country)) +
+  geom_line(size = 0.8) +
+  geom_line(data = subset(G7_energy, Country == "UK"), size = 1.5) +
+  scale_color_manual(values = c("UK" = "red",
+                                "France" = "blue",
+                                "Germany" = "green",
+                                "Italy" = "purple",
+                                "Japan" = "orange",
+                                "US" = "black",
+                                "Canada" = "pink"), guide = guide_legend(title = "Country")) +
+  labs(x = "Date (Year)", y = "12-Month Rate of Energy CPI Inflation (%)", 
+       title = expression(bold(underline("12-Month Rate of Energy Inflation across major G7 Countries since the Pandemic")))) +
+  theme_minimal() +
+   scale_x_date(date_breaks = "3 months", date_labels = "%b %Y")  
+G7_nrg_graph <- G7_nrg_graph + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+plot(G7_nrg_graph)
+
+```
+Since 2019, energy prices are up by a cumulative 69% in the UK, 63% in Italy, 47% in Germany, 37% in France, 30% in the US, 25% in Canada, and 10% in Japan. This does not however paint the full picture, European countries experienced a vastly different rise in gas prices in comparison to non-European countries. In the UK alone, the nation saw a quadrupling price of gas in the 2021. Despite Ofgem price capping effects, the cost of living impact was drastic, with an **Energy Price Guarantee (EPG)** being introduced in October 2022 at **£2500** to aid households during the most turbulent period.
+
+## <span style="color:navy;">Goods and Services</span> 
+
+Energy inflation is not the only factor effecting the cost of living crisis however, many goods and services are having a substantial impact on the cost of living crisis too. As energy prices increase, it is only natural to assume that the higher costs for businesses would funnel down to higher prices for consumers. In order to investigate this relationship between energy price rises and goods and services further, CPI inflation rates of a variety of classes of goods and services are illustrated in figure 3 below to show how they specifically contribute to the crisis. 
+
+Data was obtained from [ONS: Food and energy price inflation, UK:2023](https://www.ons.gov.uk/economy/inflationandpriceindices/articles/foodandenergypriceinflationuk/2023)
+
+```{r Goods and Services, echo = FALSE}
+#Read in data from ONS article
+GS_CPI <- read.csv("Data/In_the_year_to_March_2023_over_70%_of_CPI_items_experienced_a_price_increase_of_at_least_4%.csv", header = TRUE, skip = 6)
+# Some data manipulation to rename and retype some columns 
+names(GS_CPI)[1] = "Item"
+names(GS_CPI)[2] = "Food and non-alcoholic beverages"
+GS_CPI <- GS_CPI %>%
+  gather(key = "Variable", value = "Value", -Item) %>%
+  filter(complete.cases(.)) %>%
+  arrange(Value)
+names(GS_CPI)[2] = "Category"
+
+# Graph of multiple goods and services classes impact on CPI inflation
+GS_graph <- ggplot(data = GS_CPI, aes(x = reorder(Item, -Value), y = Value, fill = Category)) +
+  geom_bar(stat = "identity", width = 0.8) +
+  labs(
+    x = "Goods and Services",
+    y = "12-Month Rate of CPI Inflation (%)",
+    title = expression(bold(underline("12-Month Rate of CPI Inflation for Goods and Services from March 2022-2023")))
+  ) +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 6), 
+        legend.position = "bottom",
+        legend.text = element_text(size = 8)) + 
+  scale_fill_manual(values = c( "Food and non-alcoholic beverages"  = "purple", "Energy" = "blue", "Other" = "darkgreen")) +
+  coord_flip()
+plot(GS_graph)
+
+```
+Over **70%** of these 85 items have experience record high CPI inflation rates. The worst of which being food and transport. The annual inflation rate for many food items is in the double digits, exceeding **20-25%** in cases such as milk, cheese and eggs. This suggests that some non-energy items are likely being led by the higher energy prices due to the links between their sectors. The exact relationship of which is explored further in the next section.  
+
+### <span style="color:navy;">Energy Intensity: Division Level</span> 
+
+Due to the conclusion of the previous figure's analysis a more detailed understanding of the relationship being an economic sector's CPI inflation and its link to the energy sector is required. The energy intensity of various major divisions, excluding the direct effects of energy, is explored in Figure 4 below.   
+
+Data was obtained from [ONS: The energy intensity of the Consumer Prices Index: 2022](https://www.ons.gov.uk/economy/inflationandpriceindices/articles/theenergyintensityoftheconsumerpricesindex/2022)
+
+```{r Energy Intensity: Division Level, echo = FALSE}
+# Read data from ONS article
+nrg_intensity <- read.csv("Data/Restaurants_and_hotels_have_the_highest_energy_intensity_at_the_CPI_division_level,_if_we_exclude_those_that_include_the_direct_effects_of_energy.csv", header = TRUE, skip = 7)
+# Some data manipulation to rename and retype some columns 
+names(nrg_intensity)[1] = "Division"
+
+# Plot of energy intensity at the CPI division level, excluding direct effects of energy
+nrg_intensity_graph <- ggplot(data = nrg_intensity, aes(x = reorder(Division, -Energy.Intensity), y = Energy.Intensity)) +
+  geom_bar(stat = "identity", width = 0.9, fill = "darkgreen") +
+  labs(
+    x = "",
+    y = "%",
+    title = expression(bold(underline("Energy Intensity at the CPI Division Level, Excluding Direct Effects of Energy")))) +
+  theme_minimal() +
+  coord_flip()
+plot(nrg_intensity_graph)
+
+```
+Clearly, the energy intensity for housing and household service (**20.5%**) - which does include gas electricity and liquid fuels - and transport (**17.5%**) which does includes fuels and lubricants are the highest unsurprisingly. If we remove fuels and lubricants, the remainder of transport has an energy intensity of **2.7%**, reflecting the relatively high energy intensity of other transport products.Household services follow a similar pattern, without the energy components the housing and household services division has an energy intensity of only **1.2%**. This thoroughly conveys that the higher the energy intensity of an economic sector, strongly correlates to the sector's CPI inflation.
+
+## <span style="color:navy;">Contributions to CPI by Energy Intensity </span> 
+
+To further consolidate the link between energy intensity and CPI inflation in non-direct energy sectors, figure 5 shows the breakdown of high and low energy intensity consumer goods and services from 2018-2023.
+
+Data was obtained from [ONS: The energy intensity of the Consumer Prices Index: 2022](https://www.ons.gov.uk/economy/inflationandpriceindices/articles/theenergyintensityoftheconsumerpricesindex/2022)
+```{r CPI:Energy Intensity, echo = FALSE}
+# Read data from ONS article
+intensity_CPI <- read.csv("Data/More_than_three-quarters_of_the_10.csv", header = TRUE, skip = 8)
+# Some data manipulation to rename and retype some columns
+names(intensity_CPI)[1] = "Date"
+intensity_CPI$Date <- as.Date(paste0("01-", intensity_CPI$Date), format = "%d-%Y %b")
+intensity_CPI <- intensity_CPI %>%
+  pivot_longer(cols = c("Rents","Energy", "Very.high", "High", "Low","Very.low"), names_to = "Category", values_to = "Value")
+intensity_CPI$Category <- factor(intensity_CPI$Category, levels = c("Rents","Energy", "Very.high", "High", "Low","Very.low"))
+
+# Graph of Contributions to Consumer Prices Index (CPI) inflation by energy intensity, percentage points, UK, January 2019 to February 2023
+intensity_CPI_comp <- ggplot(data = intensity_CPI, aes(x = Date, y = Value, fill = Category)) +
+  geom_bar(stat = "identity", position = "stack", width = 10) +
+  labs(
+    x = "Date",
+    y = "Contribution to CPI (%)",
+    title = expression(bold(underline("Contributions to CPI inflation by Energy Intensity from January 2019 to February 2023")))) +
+  theme_minimal() +
+  scale_fill_manual(values = c(
+    "Rents" = "purple",
+    "Energy" = "blue",
+    "Very.high" = "red",
+    "High" = "orange",
+    "Low" = "darkgreen",
+    "Very.low" = "green")) +
+  scale_x_date(date_breaks = "2 months", date_labels = "%b %Y")  
+intensity_CPI_comp <- intensity_CPI_comp + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+plot(intensity_CPI_comp)
+
+```
+This details that those goods and services with higher energy intensity are making the largest contribution to inflation (bar the direct energy price hikes). Besides the direct energy components,the *high* energy intensity components have made the largest contribution to the 12-month CPI inflation rate in the last 8 months, as higher energy prices have pushed up the costs and prices for these components the most. Isolating the last 12 months from February 2022-23, CPI inflation was **10.4%**, of which **33%** was from direct energy effects, **20%** from **very high** energy intensity goods and services and a further **25%** from **high** energy intensity.
+
+## <span style="color:navy;">Conclusive Policy Recommendation</span> 
+
+This independent analysis clearly conveys the emphasis on the direct energy components and their vital role in the Consumer Price Index inflation and therefore in turn, the cost of living crisis. As a vast percentage of the current inflation crisis in the UK can be traced back to this, my policy recommendation is to focus most government aid schemes and resources to limiting the price of energy for businesses and households. Government aid schemes like the Energy Price Guarantee would have a substantial impact on bringing the inflation levels down to an acceptable rate which would help hugely with the cost of living crisis and therefore be a great incentive for public spending to increase, helping to stabilise the economy.    
+
+
+# <span style="color:navy; font-weight:bold;">Project Summary</span> 
+
+My process for this analysis document was to firstly read through relevant articles and from there outline a research question and structure for the analysis. I utilised data from a couple articles I found to create graphs in my R Project (which I had linked to GitHub). After coding my visualisations, I went about designing an RMarkdown document that I could display my data on and pair with some basic analysis (due to the limited time!).
+
+I found the code great practice and was able to recall and use a lot of information from previous modules to aid in making clearer and more precise graphs. Creating an R Project and linking it to GitHub was a task that took some remembering but in the end I figured it out, it was a great help for me to structure my work and package all my work together for sharing/viewing. Did want to try some Geospatial work but couldn't find the right data for this so hopefully get a chance to work on that module too!
+
+Was not too sure on if this was what was expected, however I feel like I have learned a lot about how far I have come throughout the last year!
+
+
+
